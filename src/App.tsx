@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, newId } from "./api";
 import { Graph } from "./Graph";
-import { wouldCycle } from "./graph";
+import { wouldCycle } from "./layout";
 import { Settings } from "./Settings";
 import { TaskPanel } from "./TaskPanel";
 import { WorkerView } from "./WorkerView";

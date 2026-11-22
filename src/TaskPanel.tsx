@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { phaseOf, wouldCycle } from "./graph";
+import { phaseOf, wouldCycle } from "./layout";
 import { PHASE_LABEL } from "./Graph";
 import type { Status, Task, Worker } from "./types";
 

@@ -1,4 +1,4 @@
-import { phaseOf, topoOrder } from "./graph";
+import { phaseOf, topoOrder } from "./layout";
 import type { Phase, Task, Worker } from "./types";
 
 interface Props {

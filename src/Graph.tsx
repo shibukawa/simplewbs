@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { LABEL_W, NODE_H, NODE_W, layout, phaseOf, related } from "./graph";
+import { LABEL_W, NODE_H, NODE_W, layout, phaseOf, related } from "./layout";
 import type { Phase, Task, Worker } from "./types";
 
 export const PHASE_LABEL: Record<Phase, string> = { doing: "作業中", done: "完了", ready: "着手可", blocked: "待ち" };
