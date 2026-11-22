@@ -15,14 +15,8 @@
 		{
 			"binding": "DB",
 			"database_name": "simplewbs",
-			// `npx wrangler d1 create simplewbs` で表示される ID に置き換えてください
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "025512a7-6ae1-4fff-a1e7-0e9aadd0f72b",
 			"migrations_dir": "migrations"
-		},
-		{
-			"binding": "simplewbs",
-			"database_name": "simplewbs",
-			"database_id": "025512a7-6ae1-4fff-a1e7-0e9aadd0f72b"
 		}
 	],
 	"vars": {
