@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { phaseOf, topoOrder } from "./layout";
 import type { Phase, Task, Worker } from "./types";
 
@@ -6,6 +7,7 @@ interface Props {
   workers: Worker[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onAssign: (id: string, workerId: string | null) => void;
 }
 
 const SECTIONS: { phase: Phase; label: string }[] = [
@@ -14,13 +16,14 @@ const SECTIONS: { phase: Phase; label: string }[] = [
   { phase: "blocked", label: "待ち（先行タスク未完了）" },
 ];
 
-export function WorkerView({ tasks, workers, selectedId, onSelect }: Props) {
+export function WorkerView({ tasks, workers, selectedId, onSelect, onAssign }: Props) {
+  const [over, setOver] = useState<string | null>(null);
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const ordered = topoOrder(tasks);
   const ids = new Set(workers.map((w) => w.id));
   const columns: { key: string; worker: Worker | null }[] = [
     ...workers.map((w) => ({ key: w.id, worker: w })),
-    ...(tasks.some((t) => !t.workerId || !ids.has(t.workerId)) ? [{ key: "__none", worker: null }] : []),
+    { key: "__none", worker: null },
   ];
 
   return (
@@ -29,7 +32,27 @@ export function WorkerView({ tasks, workers, selectedId, onSelect }: Props) {
         const mine = ordered.filter((t) => (worker ? t.workerId === worker.id : !t.workerId || !ids.has(t.workerId)));
         const done = mine.filter((t) => t.status === "done").length;
         return (
-          <section key={key} className="worker-col" style={{ ["--w" as string]: worker?.color ?? "var(--muted)" }}>
+          <section
+            key={key}
+            className={`worker-col ${over === key ? "drop-target" : ""}`}
+            style={{ ["--w" as string]: worker?.color ?? "var(--muted)" }}
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes("application/x-wbs-task")) return;
+              e.preventDefault();
+              setOver(key);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setOver(null);
+              const id = e.dataTransfer.getData("application/x-wbs-task");
+              const t = byId.get(id);
+              const cur = t?.workerId && ids.has(t.workerId) ? t.workerId : null;
+              if (t && cur !== (worker?.id ?? null)) onAssign(id, worker?.id ?? null);
+            }}
+          >
             <h3>
               <span className="dot" />
               {worker?.name ?? "未割当"}
@@ -49,7 +72,16 @@ export function WorkerView({ tasks, workers, selectedId, onSelect }: Props) {
                       {list.map((t) => {
                         const waiting = t.deps.map((d) => byId.get(d)).filter((d): d is Task => !!d && d.status !== "done");
                         return (
-                          <li key={t.id} className={t.id === selectedId ? "selected" : ""} onClick={() => onSelect(t.id)}>
+                          <li
+                            key={t.id}
+                            className={t.id === selectedId ? "selected" : ""}
+                            onClick={() => onSelect(t.id)}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("application/x-wbs-task", t.id);
+                              e.dataTransfer.effectAllowed = "move";
+                            }}
+                          >
                             <div className="wt">{t.title}</div>
                             <div className="wm">
                               {t.dueMemo && <span>⏱ {t.dueMemo}</span>}
@@ -66,7 +98,7 @@ export function WorkerView({ tasks, workers, selectedId, onSelect }: Props) {
           </section>
         );
       })}
-      {columns.length === 0 && <p className="empty-static">ワーカーがいません。設定から追加してください。</p>}
+      {workers.length === 0 && <p className="empty-static">ワーカーがいません。設定から追加してください。</p>}
     </div>
   );
 }

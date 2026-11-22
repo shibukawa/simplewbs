@@ -15,6 +15,7 @@ interface Props {
   onUnlink: (from: string, to: string) => void;
   onCycleStatus: (id: string) => void;
   onAddInLane: (workerId: string | null) => void;
+  onAssign: (id: string, workerId: string | null) => void;
 }
 
 export function Graph(props: Props) {
@@ -26,6 +27,9 @@ export function Graph(props: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ from: string; x: number; y: number } | null>(null);
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
+  // タスク本体のドラッグ（レーン移動 = 担当変更）
+  const [move, setMove] = useState<{ id: string; x: number; y: number; offX: number; offY: number } | null>(null);
+  const suppressClick = useRef(false);
 
   const toLocal = (e: { clientX: number; clientY: number }) => {
     const r = wrapRef.current!.getBoundingClientRect();
@@ -48,6 +52,40 @@ export function Graph(props: Props) {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
+
+  const laneAt = (y: number) => L.lanes.find((l) => y >= l.y && y < l.y + l.height) ?? null;
+
+  const startMove = (e: React.PointerEvent, id: string) => {
+    if (!groupByWorker || e.button !== 0) return;
+    const pos = L.nodes.get(id);
+    if (!pos) return;
+    const start = toLocal(e);
+    const offX = start.x - pos.x, offY = start.y - pos.y;
+    let moved = false;
+    const onMove = (ev: PointerEvent) => {
+      const p = toLocal(ev);
+      if (!moved && Math.hypot(p.x - start.x, p.y - start.y) < 6) return;
+      moved = true;
+      setMove({ id, x: p.x, y: p.y, offX, offY });
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setMove(null);
+      if (!moved) return;
+      suppressClick.current = true;
+      setTimeout(() => (suppressClick.current = false), 0);
+      const lane = laneAt(toLocal(ev).y);
+      if (!lane) return;
+      const wid = lane.worker?.id ?? null;
+      const t = byId.get(id);
+      const cur = t?.workerId && workerById.has(t.workerId) ? t.workerId : null;
+      if (t && wid !== cur) props.onAssign(id, wid);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  const dropLane = move ? laneAt(move.y) : null;
 
   const isDim = (id: string) => rel !== null && id !== selectedId && !rel.up.has(id) && !rel.down.has(id);
 
@@ -89,7 +127,7 @@ export function Graph(props: Props) {
         {L.lanes.map((lane, i) => (
           <div
             key={lane.key}
-            className={`lane ${i % 2 ? "odd" : ""}`}
+            className={`lane ${i % 2 ? "odd" : ""} ${dropLane?.key === lane.key ? "drop-target" : ""}`}
             style={{ top: lane.y, height: lane.height, ["--lane" as string]: lane.worker?.color ?? "var(--muted)" }}
           >
             <div className="lane-label" style={{ width: LABEL_W }}>
@@ -163,18 +201,25 @@ export function Graph(props: Props) {
         </svg>
 
         {tasks.map((t) => {
-          const p = L.nodes.get(t.id);
-          if (!p) return null;
+          const base = L.nodes.get(t.id);
+          if (!base) return null;
+          const moving = move?.id === t.id;
+          const p = moving ? { x: move.x - move.offX, y: move.y - move.offY } : base;
           const phase = phaseOf(t, byId);
           const w = t.workerId ? workerById.get(t.workerId) : undefined;
           return (
             <div
               key={t.id}
               data-task-id={t.id}
-              className={`node phase-${phase} ${t.id === selectedId ? "selected" : ""} ${isDim(t.id) ? "dim" : ""} ${drag ? "linking" : ""}`}
+              className={`node phase-${phase} ${t.id === selectedId ? "selected" : ""} ${isDim(t.id) ? "dim" : ""} ${drag ? "linking" : ""} ${moving ? "moving" : ""} ${groupByWorker ? "movable" : ""}`}
               style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H, ["--w" as string]: w?.color ?? "var(--muted)" }}
+              onPointerDown={(e) => {
+                if ((e.target as HTMLElement).closest(".handle, .badge")) return;
+                startMove(e, t.id);
+              }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (suppressClick.current) return;
                 if ((e.shiftKey || e.metaKey || e.ctrlKey) && selectedId && selectedId !== t.id) props.onLink(selectedId, t.id);
                 else props.onSelect(t.id);
               }}

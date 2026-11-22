@@ -610,3 +610,51 @@ main {
   border-radius: 8px;
   z-index: 30;
 }
+
+/* ---------- drag to reassign ---------- */
+.node.movable {
+  cursor: grab;
+  touch-action: none;
+}
+.node.moving {
+  cursor: grabbing;
+  z-index: 6;
+  opacity: 0.9;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  transition: none;
+  pointer-events: none;
+}
+.lane.drop-target {
+  background: color-mix(in srgb, var(--lane) 14%, var(--lane-a));
+}
+.worker-col.drop-target {
+  outline: 2px dashed var(--w);
+  outline-offset: 2px;
+}
+.wsec li[draggable="true"] {
+  cursor: grab;
+}
+
+/* ---------- FAB ---------- */
+.fab {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  z-index: 8;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  justify-content: center;
+  padding: 0;
+  font-size: 30px;
+  line-height: 1;
+  background: var(--primary);
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 28%);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.fab:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 32%);
+}

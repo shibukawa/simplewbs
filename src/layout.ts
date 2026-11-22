@@ -108,8 +108,6 @@ export function layout(tasks: Task[], workers: Worker[], groupByWorker: boolean)
   }
   for (const def of laneDefs) {
     const rows = laneRows.get(def.key)!;
-    // 未割当レーンはタスクが無ければ出さない
-    if (def.key === "__none" && !grouped.has("__none") && workers.length > 0) continue;
     const height = rows * NODE_H + (rows - 1) * GAP_Y + LANE_PAD * 2;
     lanes.push({ key: def.key, worker: def.worker, y, height });
     y += height;

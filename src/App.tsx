@@ -197,6 +197,11 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
     putTask({ ...target, deps: [...target.deps, from] });
   };
 
+  const assign = (id: string, workerId: string | null) => {
+    const t = data?.tasks.find((x) => x.id === id);
+    if (t) putTask({ ...t, workerId });
+  };
+
   const visibleTasks = useMemo(() => (data ? (hideDone ? data.tasks.filter((t) => t.status !== "done") : data.tasks) : []), [data, hideDone]);
   const selected = data?.tasks.find((t) => t.id === selectedId) ?? null;
 
@@ -258,9 +263,6 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
             <span className="progress">
               完了 {doneCount}/{data.tasks.length}
             </span>
-            <button className="primary" onClick={() => addTask(null)}>
-              ＋ タスク
-            </button>
             <button onClick={() => setShowSettings(true)}>設定</button>
           </>
         )}
@@ -301,9 +303,15 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
               if (t) putTask({ ...t, status: NEXT_STATUS[t.status] });
             }}
             onAddInLane={(wid) => addTask(groupByWorker ? wid : null)}
+            onAssign={assign}
           />
         )}
-        {data && view === "workers" && <WorkerView tasks={visibleTasks} workers={data.workers} selectedId={selectedId} onSelect={setSelectedId} />}
+        {data && view === "workers" && <WorkerView tasks={visibleTasks} workers={data.workers} selectedId={selectedId} onSelect={setSelectedId} onAssign={assign} />}
+        {data && (
+          <button className="fab" title="タスクを追加" aria-label="タスクを追加" onClick={() => addTask(null)}>
+            ＋
+          </button>
+        )}
         {data && selected && (
           <TaskPanel
             key={selected.id}
@@ -330,7 +338,7 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
 
       {view === "graph" && data && data.tasks.length > 0 && (
         <footer className="help">
-          クリック: 選択（前後のつながりを強調）／ 右端の ● をドラッグ: 後続タスクへ依存を追加 ／ 選択中に Shift+クリック: 依存を追加・解除 ／ 矢印クリック: 依存を削除 ／ バッジクリック: 状態切替
+          クリック: 選択（前後のつながりを強調）／ タスクを別レーンへドラッグ: 担当変更 ／ 右端の ● をドラッグ: 後続タスクへ依存を追加 ／ 選択中に Shift+クリック: 依存を追加・解除 ／ 矢印クリック: 依存を削除 ／ バッジクリック: 状態切替
         </footer>
       )}
 
