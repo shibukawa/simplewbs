@@ -1,0 +1,6 @@
+# ローカル開発用。.dev.vars にコピーして使う
+# DEV_LOGIN を設定すると localhost では GitHub を使わずにその名前でログインできる
+DEV_LOGIN=alice
+ALLOWED_LOGINS=alice,bob
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=

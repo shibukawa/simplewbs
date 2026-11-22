@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "simplewbs",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "simplewbs",
+      // `npx wrangler d1 create simplewbs` で表示される ID に置き換えてください
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    // ストレージ肥大化を防ぐ上限（任意で変更）
+    "MAX_PROJECTS_PER_USER": "20",
+    "MAX_TASKS_PER_PROJECT": "1000",
+    "MAX_WORKERS_PER_PROJECT": "50"
+  }
+  // シークレット（`npx wrangler secret put <NAME>` で設定。デプロイしても消えない）:
+  //   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+  //   ALLOWED_LOGINS  … 利用を許可する GitHub ユーザー名をカンマ区切りで（例: "shibukawa,alice"）。
+  //                     ここに無い人はログインできず、外した時点で既存セッションも無効になる。
+}
