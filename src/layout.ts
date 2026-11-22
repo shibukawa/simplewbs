@@ -1,11 +1,16 @@
 import type { Phase, Task, Worker } from "./types";
 
-export const NODE_W = 210;
-export const NODE_H = 68;
-const GAP_X = 64;
-const GAP_Y = 12;
-const LANE_PAD = 14;
-export const LABEL_W = 150;
+export interface Size {
+  nodeW: number;
+  nodeH: number;
+  gapX: number;
+  gapY: number;
+  lanePad: number;
+  labelW: number;
+}
+export const SIZE_NORMAL: Size = { nodeW: 210, nodeH: 68, gapX: 64, gapY: 12, lanePad: 14, labelW: 150 };
+/** スマホ向け */
+export const SIZE_COMPACT: Size = { nodeW: 156, nodeH: 64, gapX: 40, gapY: 10, lanePad: 10, labelW: 76 };
 
 export function phaseOf(task: Task, byId: Map<string, Task>): Phase {
   if (task.status === "done") return "done";
@@ -77,9 +82,12 @@ export interface Layout {
   width: number;
   height: number;
   columns: number;
+  size: Size;
 }
 
-export function layout(tasks: Task[], workers: Worker[], groupByWorker: boolean): Layout {
+export function layout(tasks: Task[], workers: Worker[], groupByWorker: boolean, size: Size = SIZE_NORMAL): Layout {
+  const { nodeW: NODE_W, nodeH: NODE_H, gapX: GAP_X, gapY: GAP_Y, lanePad: LANE_PAD, labelW: LABEL_W } = size;
+  const left = LABEL_W + (LABEL_W < 100 ? 14 : 24);
   const levels = computeLevels(tasks);
   const columns = Math.max(0, ...levels.values()) + 1;
   const workerIds = new Set(workers.map((w) => w.id));
@@ -126,14 +134,14 @@ export function layout(tasks: Task[], workers: Worker[], groupByWorker: boolean)
         .sort((a, b) => (a.s === b.s ? a.t.sort - b.t.sort || a.i - b.i : a.s - b.s))
         .forEach(({ t }, i) => {
           nodes.set(t.id, {
-            x: LABEL_W + 24 + c * (NODE_W + GAP_X),
+            x: left + c * (NODE_W + GAP_X),
             y: laneY.get(lane.key)! + LANE_PAD + i * (NODE_H + GAP_Y),
           });
         });
     }
   }
 
-  return { nodes, lanes, width: LABEL_W + 24 + columns * (NODE_W + GAP_X) + 40, height: Math.max(y, 200), columns };
+  return { nodes, lanes, width: left + columns * (NODE_W + GAP_X) + 40, height: Math.max(y, 200), columns, size };
 }
 
 /** トポロジカル順（列 → sort）。ワーカー別一覧用 */

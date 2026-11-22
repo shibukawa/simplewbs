@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, newId } from "./api";
 import { Graph } from "./Graph";
-import { wouldCycle } from "./layout";
+import { SIZE_COMPACT, SIZE_NORMAL, wouldCycle } from "./layout";
 import { Settings } from "./Settings";
 import { TaskPanel } from "./TaskPanel";
 import { WorkerView } from "./WorkerView";
@@ -11,6 +11,17 @@ const POLL_MS = 5000;
 const NEXT_STATUS: Record<Status, Status> = { todo: "doing", doing: "done", done: "todo" };
 
 const readHash = () => location.hash.match(/^#\/p\/([0-9a-f]+)/)?.[1] ?? null;
+
+function useMediaQuery(q: string) {
+  const [m, setM] = useState(() => window.matchMedia(q).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(q);
+    const on = () => setM(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [q]);
+  return m;
+}
 
 function usePref<T>(key: string, init: T) {
   const [v, setV] = useState<T>(() => {
@@ -69,6 +80,7 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
   const [hideDone, setHideDone] = usePref("wbs.hideDone", false);
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const compact = useMediaQuery("(max-width: 720px)");
   const inflight = useRef(0);
   const dirty = useRef(false);
 
@@ -228,20 +240,31 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
   return (
     <div className="app">
       <header>
-        <strong className="logo">Simple WBS</strong>
-        <select value={pid ?? ""} onChange={(e) => setPid(e.target.value || null)}>
-          {projects.length === 0 && <option value="">（プロジェクトなし）</option>}
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <button onClick={createProject} title="新しいプロジェクト">
-          ＋
-        </button>
+        <div className="h-main">
+          <strong className="logo">Simple WBS</strong>
+          <select className="project-select" value={pid ?? ""} onChange={(e) => setPid(e.target.value || null)}>
+            {projects.length === 0 && <option value="">（プロジェクトなし）</option>}
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={createProject} title="新しいプロジェクト">
+            ＋
+          </button>
+          {data && <button onClick={() => setShowSettings(true)}>設定</button>}
+          <span className="spacer" />
+          <span className="me" title={`@${me.login}`}>
+            {me.avatar_url && <img src={me.avatar_url} alt="" />}
+            <span className="me-name">@{me.login}</span>
+          </span>
+          <a className="btn" href="/auth/logout" title="ログアウト">
+            {compact ? "⏻" : "ログアウト"}
+          </a>
+        </div>
         {data && (
-          <>
+          <div className="h-tools">
             <div className="segmented">
               <button className={view === "graph" ? "on" : ""} onClick={() => setView("graph")}>
                 依存グラフ
@@ -253,7 +276,7 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
             {view === "graph" && (
               <label className="check">
                 <input type="checkbox" checked={groupByWorker} onChange={(e) => setGroupByWorker(e.target.checked)} />
-                ワーカーでレーン分け
+                {compact ? "レーン分け" : "ワーカーでレーン分け"}
               </label>
             )}
             <label className="check">
@@ -263,16 +286,8 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
             <span className="progress">
               完了 {doneCount}/{data.tasks.length}
             </span>
-            <button onClick={() => setShowSettings(true)}>設定</button>
-          </>
+          </div>
         )}
-        <span className="spacer" />
-        <span className="me">
-          {me.avatar_url && <img src={me.avatar_url} alt="" />}@{me.login}
-        </span>
-        <a className="btn" href="/auth/logout">
-          ログアウト
-        </a>
       </header>
 
       <main>
@@ -304,6 +319,7 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
             }}
             onAddInLane={(wid) => addTask(groupByWorker ? wid : null)}
             onAssign={assign}
+            size={compact ? SIZE_COMPACT : SIZE_NORMAL}
           />
         )}
         {data && view === "workers" && <WorkerView tasks={visibleTasks} workers={data.workers} selectedId={selectedId} onSelect={setSelectedId} onAssign={assign} />}
@@ -336,9 +352,11 @@ function Main({ me, allowedLogins }: { me: User; allowedLogins: string[] }) {
         )}
       </main>
 
-      {view === "graph" && data && data.tasks.length > 0 && (
+      {view === "graph" && data && data.tasks.length > 0 && !(compact && selected) && (
         <footer className="help">
-          クリック: 選択（前後のつながりを強調）／ タスクを別レーンへドラッグ: 担当変更 ／ 右端の ● をドラッグ: 後続タスクへ依存を追加 ／ 選択中に Shift+クリック: 依存を追加・解除 ／ 矢印クリック: 依存を削除 ／ バッジクリック: 状態切替
+          {compact
+            ? "タップ: 選択 ／ 長押しして別レーンへ: 担当変更 ／ 右端の ● をドラッグ: 依存を追加 ／ 矢印タップ: 依存を削除"
+            : "クリック: 選択（前後のつながりを強調）／ タスクを別レーンへドラッグ: 担当変更 ／ 右端の ● をドラッグ: 後続タスクへ依存を追加 ／ 選択中に Shift+クリック: 依存を追加・解除 ／ 矢印クリック: 依存を削除 ／ バッジクリック: 状態切替"}
         </footer>
       )}
 

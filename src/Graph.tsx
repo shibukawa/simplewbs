@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { LABEL_W, NODE_H, NODE_W, layout, phaseOf, related } from "./layout";
+import { type Size, layout, phaseOf, related } from "./layout";
 import type { Phase, Task, Worker } from "./types";
 
 export const PHASE_LABEL: Record<Phase, string> = { doing: "作業中", done: "完了", ready: "着手可", blocked: "待ち" };
@@ -16,11 +16,13 @@ interface Props {
   onCycleStatus: (id: string) => void;
   onAddInLane: (workerId: string | null) => void;
   onAssign: (id: string, workerId: string | null) => void;
+  size: Size;
 }
 
 export function Graph(props: Props) {
   const { tasks, allTasks, workers, groupByWorker, selectedId } = props;
-  const L = useMemo(() => layout(tasks, workers, groupByWorker), [tasks, workers, groupByWorker]);
+  const L = useMemo(() => layout(tasks, workers, groupByWorker, props.size), [tasks, workers, groupByWorker, props.size]);
+  const { nodeW: NODE_W, nodeH: NODE_H, labelW: LABEL_W } = L.size;
   const byId = useMemo(() => new Map(allTasks.map((t) => [t.id, t])), [allTasks]);
   const workerById = useMemo(() => new Map(workers.map((w) => [w.id, w])), [workers]);
   const rel = useMemo(() => (selectedId ? related(tasks, selectedId) : null), [tasks, selectedId]);
@@ -59,22 +61,48 @@ export function Graph(props: Props) {
     if (!groupByWorker || e.button !== 0) return;
     const pos = L.nodes.get(id);
     if (!pos) return;
+    // タッチでは長押しでドラッグ開始（すぐ動かした場合は通常のスクロール）
+    const touch = e.pointerType !== "mouse";
     const start = toLocal(e);
+    const sx = e.clientX, sy = e.clientY;
     const offX = start.x - pos.x, offY = start.y - pos.y;
     let moved = false;
+    let timer = 0;
+    const preventScroll = (ev: TouchEvent) => ev.preventDefault();
+    const cleanup = () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("touchmove", preventScroll);
+    };
+    const autoScroll = (ev: PointerEvent) => {
+      const el = wrapRef.current!;
+      const r = el.getBoundingClientRect();
+      const edge = 40, step = 14;
+      const dx = ev.clientX < r.left + edge ? -step : ev.clientX > r.right - edge ? step : 0;
+      const dy = ev.clientY < r.top + edge ? -step : ev.clientY > r.bottom - edge ? step : 0;
+      if (dx || dy) el.scrollBy(dx, dy);
+    };
     const onMove = (ev: PointerEvent) => {
+      if (touch && !moved) {
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) cleanup();
+        return;
+      }
       const p = toLocal(ev);
-      if (!moved && Math.hypot(p.x - start.x, p.y - start.y) < 6) return;
-      moved = true;
+      if (!moved) {
+        if (Math.hypot(p.x - start.x, p.y - start.y) < 6) return;
+        moved = true;
+      }
+      autoScroll(ev);
       setMove({ id, x: p.x, y: p.y, offX, offY });
     };
     const onUp = (ev: PointerEvent) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      cleanup();
       setMove(null);
       if (!moved) return;
       suppressClick.current = true;
-      setTimeout(() => (suppressClick.current = false), 0);
+      setTimeout(() => (suppressClick.current = false), 50);
       const lane = laneAt(toLocal(ev).y);
       if (!lane) return;
       const wid = lane.worker?.id ?? null;
@@ -82,8 +110,21 @@ export function Graph(props: Props) {
       const cur = t?.workerId && workerById.has(t.workerId) ? t.workerId : null;
       if (t && wid !== cur) props.onAssign(id, wid);
     };
+    const onCancel = () => {
+      cleanup();
+      setMove(null);
+    };
+    if (touch) {
+      timer = window.setTimeout(() => {
+        moved = true;
+        navigator.vibrate?.(15);
+        window.addEventListener("touchmove", preventScroll, { passive: false });
+        setMove({ id, x: start.x, y: start.y, offX, offY });
+      }, 400);
+    }
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
   };
   const dropLane = move ? laneAt(move.y) : null;
 
