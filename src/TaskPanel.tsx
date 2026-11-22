@@ -73,7 +73,10 @@ export function TaskPanel({ task, tasks, workers, onChange, onDelete, onSelect, 
       <input
         className="title-input"
         {...title}
-        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        onKeyDown={(e) => {
+          // IME の変換確定の Enter では確定しない（Safari は isComposing が false になるので keyCode 229 も見る）
+          if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) (e.target as HTMLInputElement).blur();
+        }}
         placeholder="タスク名"
         autoFocus={task.title === "新しいタスク"}
       />
